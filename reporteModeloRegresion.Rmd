@@ -1,0 +1,668 @@
+---
+title: "TRABAJO EDUARDO NAVARRO"
+date: '2022-12-10'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# REGRESIÓN GAMMA PARA DESCRIBIR EL COMPORTAMIENTO DE LA TASA DE MORTALIDAD TRATABLE EN MENORES DE 5 AÑOS EN COLOMBIA
+
+Cargue de librerías necesarias para hacer el analisis preliminar de correlaciones
+```{r librerias, message=FALSE, warning=FALSE}
+library(corrplot)
+library(tidyverse)
+library(GGally)
+library(Hmisc)
+library(corrplot)
+library(PerformanceAnalytics)
+```
+
+Se cargan los datos de las base de datos construida, toda vez que en Colombia no existe un marco de datos o único conjunto de datos que permita construir un modelo de regresión o cuantitativo que permita realizar inferencia estadística y evaluar los factores asociados en la defunción evitable en menores de cinco años; así las cosas, la construcción de este conjunto de datos se debe realizar de forma manual.
+Dada esta situación, el presente trabajo se reviste de gran importancia para la evaluación de los riesgos desde la prestación del servicio y las condiciones de vida pues hoy ninguna entidad académica o gubernamental está haciendo control, seguimiento y evaluación de estos factores. 
+Se utilizaron cinco fuentes de datos para construir el conjunto de datos así:
+1.	"COLOMBIA - Estadísticas Vitales 
+Fuente: Metadata Defunciones DANE 
+Periodo de datos: Enero 1998 a Diciembre 2020"
+2.	"COLOMBIA - Estadísticas Vitales 
+Fuente: Metadata Nacimientos DANE 
+Periodo de datos: Enero 1998 a Diciembre 2020"
+3.	"COLOMBIA - PIB por departamento 
+Fuente: Publicaciones PIB DANE 
+Periodo de datos: Enero 1998 a Diciembre 2020"
+4.	"COLOMBIA - Población total por departamento 
+Fuente: cubos.sispro.gov.co - Estadísticas Afiliados 
+Periodo de datos: Diciembre 2009 a Mayo 2022"
+5.	"COLOMBIA - Registro Especial de Prestadores - REPS 
+Fuente: cubos.sispro.gov.co SGD_Prestadores - Prestadores 
+Periodo de datos: Enero 2011 a Diciembre 2020"
+Se tomarán las variables que permitan explicar el comportamiento de la mortalidad al nivel de departamento, es decir, que permitan agrupar sus resultados y se excluirán las variables que solo expliquen comportamientos a nivel individual y no permitan agrupar sus resultados o explicar sus resultados a nivel departamental. (ver Excel para detalle del tratamiento que se le da a cada variable incluida y las razones de la exclusión de las que no se tomaron para el modelo)
+ 
+
+```{r datos, echo=FALSE, warning=FALSE, message=FALSE}
+library(readr)
+
+BD <- read_csv("https://raw.githubusercontent.com/daramireh/TesisDr.Eduardo/main/BD1.csv")
+
+# Se excluyen las variables dependiente y categoricas
+BD1 = BD %>% dplyr::select(-LLAVE, -DPTO, -ANO, -CATENFER, -ENFERMEDAD, -CIE10, -y)
+```
+
+
+Las variables fueron transformadas en su codificación, toda vez que los nombres originales son extensos y pueden dificultar el analisis y la construcción de modelos y códigos de programación en Rstudio o Python. Así las cosas, para la construcción del modelo en Rstudio se configuró la siguiente codificación para los nombres de las variables explicativas y de respuesta así:
+
+|Nombre Original | Codificación|
+|----------------|--------------|
+|TASA_MORTALIDAD_X_1000 | y |
+|AREA_DEFUNCION 1-CABECERA MUNICIPAL | X1 |
+|AREA_DEFUNCION 2 - CORREGIMIENTO O CASERIO | X2
+|AREA_DEFUNCION 3- RURAL DISPERSO | X3 |
+|SITIO DEFUNCION 1 - HOSPITAL CLINICA | X4 |
+|SITIO DEFUNCION 2- PUESTO SALUD | X5 |
+|SITIO DEFUNCION 3 - CASA DOMICILIO | X6 |
+|SITIO DEFUNCION 4 - TRABAJO | X7 |
+|SITIO DEFUNCION 5 - VIA PUBLICA | X8 |
+|SITIO DEFUNCION 6-OTRO | X9 |
+|AREA RESIDENCIA 1-CABECERA MUNICIPAL | X10 |
+|AREA RESIDENCIA 2 - CORREGIMIENTO O CASERIO | X11 |
+|AREA RESIDENCIA 3- RURAL DISPERSO | X12 |
+|ESTA_CIVIL_MADRE 1 - UNION LIBRE >2 AÑO | X13 |
+|ESTA_CIVIL_MADRE 2-UNION LIBRE <2 AÑOS | X14 |
+|ESTA_CIVIL_MADRE 3-SEPARADA | X15 |
+|ESTA_CIVIL_MADRE 4-VIUDA | X16 |
+|ESTA_CIVIL_MADRE 5-SOLTERA | X17 |
+|ESTA_CIVIL_MADRE 6-CASADA | X18 |
+|NIVEL_EDUCATIVO_MADRE 1-PRIMARIA | X19 |
+|NIVEL_EDUCATIVO_MADRE 2-SECUNDARIA | X20 |
+|NIVEL_EDUCATIVO_MADRE 3-TECNICO | X21 |
+|NIVEL_EDUCATIVO_MADRE 4-PROFESIONAL | X22 |
+|NIVEL_EDUCATIVO_MADRE 5-BACHILLER | X23 |
+|ASISTENCIA_MEDICA 1-SI RECIBE | X24 |
+|ASISTENCIA_MEDICA 2- NO RECIBE | X25 |
+|ASISTENCIA_MEDICA 3-IGNORADO | X26 |
+|POBLACION TOTAL | X27 |
+|PIB | X28 |
+|Total sedes IPS | X29 |
+|Grupo Servicios  1 - Internación | X30 |
+|Grupo Servicios  2 - Quirúrgicos | X31 |
+|Grupo Servicios  3 - Consulta Externa | X32 |
+|Grupo Servicios  4 - Atención Extramural | X33 |
+|Grupo Servicios  5 - Urgencias | X34 |
+|Grupo Servicios  6 - Transporte Asistencial | X35 |
+|Grupo Servicios  7 - Apoyo Diagnóstico y Complementación Terapéutica | X36 |
+|Grupo Servicios  8 - Otros Servicios | X37 |
+|Grupo Servicios  9 - Protección Especifica y Detección Temprana | X38 |
+|Servicios de 102 - GENERAL PEDIÁTRICA | X39 |
+|Servicios de 105 - CUIDADO INTERMEDIO NEONATAL | X40 |
+|Servicios de 106 - CUIDADO INTERMEDIO PEDIÁTRICO | X41 |
+|Servicios de 108 - CUIDADO INTENSIVO NEONATAL | X42 |
+|Servicios de 109 - CUIDADO INTENSIVO PEDIÁTRICO | X43 |
+|Servicios de 115 - HOSPITALIZACIÓN DÍA | X44 |
+|Servicios de 116 - QUEMADOS PEDIÁTRICO | X45 |
+|Servicios de 120 - CUIDADO BÁSICO NEONATAL | X46 |
+|Servicios de 125 - UNIDAD DE QUEMADOS PEDIÁTRICOS | X47 |
+|Servicios de 130 - HOSPITALIZACIÓN PEDIÁTRICA | X48 |
+|Servicios de 212 - CIRUGÍA PEDIÁTRICA | X49 |
+|Servicios de 227 - CIRUGÍA ONCOLÓGICA PEDIÁTRICA | X50 |
+|Servicios de 306 - CIRUGÍA PEDIÁTRICA | X51 |
+|Servicios de 342 - PEDIATRÍA | X52 |
+|Servicios de 361 - CARDIOLOGÍA PEDIÁTRICA | X53 |
+|Servicios de 374 - CIRUGÍA ONCOLÓGICA PEDIÁTRICA | X54 |
+|Servicios de 384 - NEFROLOGÍA PEDIÁTRICA | X55 |
+|Servicios de 385 - NEONATOLOGÍA | X56 |
+|Servicios de 386 - NEUMOLOGÍA PEDIÁTRICA | X57 |
+|Servicios de 388 - NEUROPEDIATRÍA | X58 |
+|Servicios de 391 - ONCOLOGÍA Y HEMATOLOGÍA PEDIÁTRICA | X59 |
+|Servicios de 392 - ORTOPEDIA INFANTIL | X60 |
+|Servicios de 396 - ODONTOPEDIATRÍA | X61 |
+|Servicios de 409 - ORTOPEDIA PEDIÁTRICA | X62 |
+|Servicios de 720 - LACTARIO - ALIMENTACIÓN | X63 |
+|Servicios de 901 - VACUNACIÓN | X64 |
+|Servicios de 907 - PROTECCIÓN ESPECÍFICA - ATENCIÓN DEL PARTO | X65 |
+|Servicios de 908 - PROTECCIÓN ESPECÍFICA - ATENCIÓN AL RECIÉN NACIDO | X66 |
+|Servicios de 909 - DETECCIÓN TEMPRANA - ALTERACIONES DEL CRECIMIENTO Y DESARROLLO ( Menor a 10 años) | X67 |
+|Servicios de 911 - DETECCIÓN TEMPRANA - ALTERACIONES DEL EMBARAZO | X68 |
+|Servicios de 916 - PROTECCIÓN ESPECÍFICA - VACUNACIÓN | X69 |
+
+```{r cajaybigotesY, echo = FALSE, message=FALSE, warning=FALSE, include=TRUE}
+ggplot(data = BD, aes(y = y))+
+  stat_boxplot(geom = "errorbar", # Bigotes
+               width = 0.2) +
+  geom_boxplot(alpha = 0.9, outlier.colour = "red") +
+  # geom_jitter(position=position_jitter(0.2),
+  #             shape=21,
+  #             fill = '#90B1DB',
+  #             color = '#90B1DB',
+  #             alpha = .5)+
+  # scale_y_continuous(name = "TASA DE MORTALIDAD") +  
+#  scale_x_discrete(name = "ENFERMEDAD") +        
+  ggtitle("Distribución del promedio de la tasa de mortalidad tratable en menores de 5 años por tipo de enfermedad") + 
+  theme_classic()+
+  theme_update(plot.title = element_text(hjust = 0.5))
+```
+
+```{r histogramaY, echo = FALSE, message=FALSE, warning=FALSE, include=TRUE}
+ggplot(BD, aes(y))+
+  geom_histogram(aes(y=..density..), colour="white", fill="grey50") +
+  ggtitle("Distribución del promedio de la tasa de mortalidad tratable 
+          en menores de 5 años por tipo de enfermedad") +
+  theme_classic()+
+  theme_update(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+## Matriz de correlaciones
+
+La matriz resultante puede consultarla aquí: https://acortar.link/mmMJrw
+
+Para el analisis de correlaciones se excluyen las variables categoricas y la variable de respuesta.
+
+```{r cambiotipo, echo = FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# se transforman a numericas todas las variables
+BD1$X1=as.numeric(BD1$X1)
+BD1$X2=as.numeric(BD1$X2)
+BD1$X3=as.numeric(BD1$X3)
+BD1$X4=as.numeric(BD1$X4)
+BD1$X5=as.numeric(BD1$X5)
+BD1$X6=as.numeric(BD1$X6)
+BD1$X7=as.numeric(BD1$X7)
+BD1$X8=as.numeric(BD1$X8)
+BD1$X9=as.numeric(BD1$X9)
+BD1$X10=as.numeric(BD1$X10)
+BD1$X11=as.numeric(BD1$X11)
+BD1$X12=as.numeric(BD1$X12)
+BD1$X13=as.numeric(BD1$X13)
+BD1$X14=as.numeric(BD1$X14)
+BD1$X15=as.numeric(BD1$X15)
+BD1$X16=as.numeric(BD1$X16)
+BD1$X17=as.numeric(BD1$X17)
+BD1$X18=as.numeric(BD1$X18)
+BD1$X19=as.numeric(BD1$X19)
+BD1$X20=as.numeric(BD1$X20)
+BD1$X21=as.numeric(BD1$X21)
+BD1$X22=as.numeric(BD1$X22)
+BD1$X23=as.numeric(BD1$X23)
+BD1$X24=as.numeric(BD1$X24)
+BD1$X25=as.numeric(BD1$X25)
+BD1$X26=as.numeric(BD1$X26)
+BD1$X27=as.numeric(BD1$X27)
+BD1$X28=as.numeric(BD1$X28)
+BD1$X29=as.numeric(BD1$X29)
+BD1$X30=as.numeric(BD1$X30)
+BD1$X31=as.numeric(BD1$X31)
+BD1$X32=as.numeric(BD1$X32)
+BD1$X33=as.numeric(BD1$X33)
+BD1$X34=as.numeric(BD1$X34)
+BD1$X35=as.numeric(BD1$X35)
+BD1$X36=as.numeric(BD1$X36)
+BD1$X37=as.numeric(BD1$X37)
+BD1$X38=as.numeric(BD1$X38)
+BD1$X39=as.numeric(BD1$X39)
+BD1$X40=as.numeric(BD1$X40)
+BD1$X41=as.numeric(BD1$X41)
+BD1$X42=as.numeric(BD1$X42)
+BD1$X43=as.numeric(BD1$X43)
+BD1$X44=as.numeric(BD1$X44)
+BD1$X45=as.numeric(BD1$X45)
+BD1$X46=as.numeric(BD1$X46)
+BD1$X47=as.numeric(BD1$X47)
+BD1$X48=as.numeric(BD1$X48)
+BD1$X49=as.numeric(BD1$X49)
+BD1$X50=as.numeric(BD1$X50)
+BD1$X51=as.numeric(BD1$X51)
+BD1$X52=as.numeric(BD1$X52)
+BD1$X53=as.numeric(BD1$X53)
+BD1$X54=as.numeric(BD1$X54)
+BD1$X55=as.numeric(BD1$X55)
+BD1$X56=as.numeric(BD1$X56)
+BD1$X57=as.numeric(BD1$X57)
+BD1$X58=as.numeric(BD1$X58)
+BD1$X59=as.numeric(BD1$X59)
+BD1$X60=as.numeric(BD1$X60)
+BD1$X61=as.numeric(BD1$X61)
+BD1$X62=as.numeric(BD1$X62)
+BD1$X63=as.numeric(BD1$X63)
+BD1$X64=as.numeric(BD1$X64)
+BD1$X65=as.numeric(BD1$X65)
+BD1$X66=as.numeric(BD1$X66)
+BD1$X67=as.numeric(BD1$X67)
+BD1$X68=as.numeric(BD1$X68)
+BD1$X69=as.numeric(BD1$X69)
+```
+
+Se utiliza el metodo de correlación de Pearson y encuentra que las varibles asociadas a los factores de prestación de servicio de salud muestran alta correlación entre ellas mas no se excluyen pues no hay una única variable que agrupe las relaciones de todas ellas y, así mismo, muestran baja correlación con las variables sociodemográficas por lo que hay independencia.
+
+```{r correlaciones 1, message=FALSE, warning=FALSE}
+correlacion = cor(BD1, method = 'pearson')
+corrplot(correlacion, method="number", type="upper")
+```
+Se excluyen las variables sociodemográficas con alta correlación esperando que al construir el modelo las variables asociadas al sistema de salud se excluyan durante la elaboración del mismo.
+
+```{r correlaciones 2, message=FALSE, warning=FALSE}
+# se extraen las variables con alta correlacion
+library(tidyverse)
+BD2 = BD1 %>% dplyr::select(-X1, -X4, -X6, -X10, -X25)
+correlacion1 = cor(BD2, method = 'pearson')
+corrplot(correlacion1, method="number", type="upper")
+```
+
+```{r correlaciones 3, message=FALSE, warning=FALSE}
+BD3 = BD2 %>%
+  dplyr::select(-X3, -X13)
+correlacion2 = cor(BD3, method = 'pearson')
+corrplot(correlacion2, method="number", type="upper")
+
+```
+
+Una vez definido el modelo de datos se evalua el modelo de regresión con mejor ajuste.
+```{r liberias 2, echo=FALSE, message=FALSE, warning=FALSE}
+library(betareg)
+library(lmtest)
+library(VGAM)
+library("fitdistrplus")
+library("univariateML")
+```
+
+
+
+```{r funcion, echo=TRUE, message=FALSE, warning=FALSE}
+
+estBetaParams <- function(mu, var) {
+  alpha <- ((1 - mu) / var - 1 / mu) * mu ^ 2
+  beta <- alpha * (1 / mu - 1)
+  return(params = list(alpha = alpha, beta = beta))
+}
+
+val=estBetaParams((mean(BD$y)), (var(BD$y)))
+
+# funcion para estimar los parametros Landa (escala) y Teta (forma) de la distribucion gamma
+fit.gamma1 <- fitdist(BD$y, distr = "gamma", method = "mle")
+
+# histograma
+
+ggplot(BD, aes(y))+
+  geom_histogram(aes(y=..density..), colour="white", fill="grey50")+
+  stat_function(aes(x = y, y = ..y..), fun = dbeta, colour="red", n = 100,
+                args = list(shape1 = val$alpha, shape2 = val$beta))+
+  stat_function(fun = dnorm,
+                args = list(mean =  sapply(BD$y, mean, na.rm = TRUE),
+                            sd = sapply(BD$y, sd, na.rm = TRUE)),
+                colour = "green", size = 1) +
+  stat_function(fun = dgamma,
+                args = list(shape = fit.gamma1$estimate[1], rate = fit.gamma1$estimate[2]), colour="blue") +
+  xlab("Proporción de tasa de mortalidad por departamento")+
+  ggtitle("Comparación de distribuciones normal, beta y gamma para mejor ajuste") + # Título del plot
+  annotate("text", x = .5, y = 4.2, label = "Verde: dist Normal", color="darkgreen")+
+  annotate("text", x = .5, y = 3.7, label = "Rojo: dist Beta", color="red")+
+  annotate("text", x = .5, y = 3.2, label = "Azul: dist Gamma", color="blue")+
+  xlim(-0.1, 0.9)
+
+```
+
+
+De manera gráfica se observa que la distribución gamma es la que tiene mejor ajuste, la distribución normal no tiene un buen ajuste y no se logra observar en la gráfica igual que la distribuión beta. Es pertinente recordar que la distribución gamma es una particularierdad de la distribución exponencial que muestra muy buen ajuste para datos estrictamente positivos cómo son las tasas.
+
+
+Sin embargo, se procede a probar el mejor ajuste a tráves del criterio de información AKAIKE y observar cuál modelo de regresión logra contener la menor perdida de información estadística
+```{r akaike, echo=FALSE, message=FALSE, warning=FALSE}
+vec = AIC(mlnorm(BD$y),
+          mlgamma(BD$y))
+
+arrange(vec, AIC)
+
+```
+
+Así las cosas, el modelo de regresión gamma muestra un criterio de información de Akaike mucho más bajo que la regresión lineal y, por lo tanto, mejor ajuste.
+
+## Construcción del modelo de regresión
+
+### Modelo logit original
+
+Para construir el modelo logit se toman las variables sociodemográficas que muestran baja correlació y las del sistema y se evalúan en la regresión Gamma
+
+El método de construcción de modelos lineales generalizados implica evaluar el modelo logit contra el modelo nulo y posteriormente contra las submodelos generados a partir de la extracción de la variable que tiene el mayor valor p. Cabe resaltar que se estima alfa como 0.05
+
+
+#### Librería VGLM
+
+Se utiliza la librería VGLM o Vector Generalizated Linear Model pues permite ajustar y construir la regresión Gamma, esto permitió tener mejores resultados en las pruebas de constraste contra el modelo nulo y la información de las variables. La librería GLM mostraba modelos que no tienen muy buen ajuste contra el modelo nulo lo que significa no poder construir un modelo con el presente cojunto de datos.
+
+En estadística, se propuso la clase de los modelos lineales generalizados vectoriales (VGLM) para ampliar el alcance de los modelos atendidos por los modelos lineales generalizados (GLM). En particular, los VGLM permiten variables de respuesta fuera de la familia exponencial clásica y más de un parámetro. Cada parámetro (no necesariamente una media) puede transformarse mediante una función de enlace. El marco de los VGLM también es lo suficientemente amplio como para dar cabida de forma natural a respuestas múltiples; se trata de varias respuestas independientes, cada una de ellas procedente de una distribución estadística concreta con valores de parámetros posiblemente diferentes.
+
+El algoritmo central adoptado es el método de mínimos cuadrados reponderados iterativamente, para la estimación de máxima verosimilitud de normalmente todos los parámetros del modelo. En particular, se implementa la puntuación de Fisher, que, para la mayoría de los modelos, utiliza la primera y la segunda derivada esperada de la función de log-verosimilitud.
+
+Así las cosas, Los VGLM son, por tanto, como los GLMs pero permiten múltiples predictores lineales, y abarcan modelos fuera los limitados confines de la familia exponencial. De hecho, la amplitud de la clase cubre una amplia gama de tipos de respuesta multivariante y modelos que incluyen distribuciones univariantes y distribuciones univariantes y multivariantes, análisis de datos categóricos, series temporales, análisis de supervivencia ecuaciones de estimación generalizadas, datos binarios correlacionados, datos de bioensayos y problemas de problemas no lineales por mínimos cuadrados (Yee et al (2007))
+
+
+```{r modelo, message=FALSE, warning=FALSE, results='hide'}
+modelo = vglm(y ~ X2 +	X5 +	X7 +	X8 +	X9 +	X11 +	X12 +	X14 +	X15 +	X16 +	X17 +	X18 +	X19 +	X20 +	
+                 X21 +	X22 +	X23	+ X24	+ X26	+ X27	+ X28 +	X29 +	X30	+ X31	+ X32	+ X33 +	X34	+ X35	+ X36	+ 
+                 X37 +	X38 +	X39 +	X40 +	X41	+ X42	+ X43	+ X44	+ X45	+ X46	+ X47 +	X48	+ X49 +	X50 +	X51 +	
+                 X52 +	X53 +	X54 +	X55 +	X56 +	X57 +	X58 +	X59 +	X60 +	X61	+ X62 +	X63 + X64 +	X65	+ X66 +	
+                 X67 +	X68 +	X69,
+                 data = BD, gamma1, trace = TRUE, crit = "coef")
+
+```
+
+#### Comparación contra el modelo nulo
+
+$H_0:$ El modelo nulo muestra mejor ajuste
+$vs$  
+$H_1:$ El modelo logit muestra mejor ajuste
+
+```{r nulo, echo=FALSE, message=FALSE, warning=FALSE}
+prueba = lrtest(modelo)
+prueba
+```
+
+
+Superada la prueba contra el modelo nulo se evalua la variable con mayor valor p de acuerdo al resumen de la regresión.
+```{r summary modelo, echo=FALSE}
+summary(modelo)
+```
+
+### Submodelos
+
+#### Para este primer submodelo se extrae la variable X16 y se compara contra el modelo nulo y el modelo logit original
+
+
+```{r sub1, message=FALSE, warning=FALSE, include=TRUE, results='hide'}
+#submodelo 1 se elimina la variable X16
+
+sub1 = vglm(y ~ X2 +	X5 +	X7 +	X8 +	X9 +	X11 +	X12 +	X14 +	X15 +	X17 +	X18 +	X19 +	X20 +	
+              X21 +	X22 +	X23	+ X24	+ X26	+ X27	+ X28 +	X29 +	X30	+ X31	+ X32	+ X33 +	X34	+ X35	+ X36	+ 
+              X37 +	X38 +	X39 +	X40 +	X41	+ X42	+ X43	+ X44	+ X45	+ X46	+ X47 +	X48	+ X49 +	X50 +	X51 +	
+              X52 +	X53 +	X54 +	X55 +	X56 +	X57 +	X58 +	X59 +	X60 +	X61	+ X62 +	X63 + X64 +	X65	+ X66 +	
+              X67 +	X68 +	X69,
+            data = BD, gamma1, trace = TRUE, crit = "coef")
+
+```
+
+Prueba modelo nulo vs submodelo
+```{r nulo sub1, echo=FALSE, warning=FALSE, message=FALSE}
+prueba = lrtest(sub1)
+prueba
+
+```
+
+Prueba submodelo vs logit original
+
+
+$H_0:$ El submodelo muestra mejor ajuste
+$vs$  
+$H_1:$ El modelo logit muestra mejor ajuste
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# superada la prueba, se prueba el submodelo vs el logit original
+prueba2 = lrtest(modelo, sub1)
+prueba2
+
+```
+
+Surtidas las pruebas se procede a continuar la construcción de los submodelos
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+summary(sub1)
+```
+
+El proceso anterior se repite hasta que el modelo nulo muestre mejor ajuste o que el nuevo submodelo no sea mejor que el logit (submodelo anterior)
+
+
+#### Submodelo2
+
+```{r submodelo2, warning=FALSE, message=FALSE, include=TRUE, results='hide'}
+#submodelo 2 se elimina la variable X62
+
+sub2 = vglm(y ~ X2 +	X5 +	X7 +	X8 +	X9 +	X11 +	X12 +	X14 +	X15 +	X17 +	X18 +	X19 +	X20 +	
+              X21 +	X22 +	X23	+ X24	+ X26	+ X27	+ X28 +	X29 +	X30	+ X31	+ X32	+ X33 +	X34	+ X35	+ X36	+ 
+              X37 +	X38 +	X39 +	X40 +	X41	+ X42	+ X43	+ X44	+ X45	+ X46	+ X47 +	X48	+ X49 +	X50 +	X51 +	
+              X52 +	X53 +	X54 +	X55 +	X56 +	X57 +	X58 +	X59 +	X60 +	X61 +	X63 + X64 +	X65	+ X66 +	
+              X67 +	X68 +	X69,
+            data = BD, gamma1, trace = TRUE, crit = "coef")
+
+```
+
+Prueba modelo nulo vs submodelo
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# submodelo vs modelo nulo
+prueba = lrtest(sub2)
+prueba
+
+```
+
+Prueba submodelo 2 vs submodelo 1
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# superada la prueba, se prueba el submodelo vs el logit original
+prueba2 = lrtest(sub1, sub2)
+prueba2
+
+```
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+summary(sub2)
+```
+
+#### Submodelo 3
+
+```{r submodelo3, warning=FALSE, message=FALSE, include=TRUE, results='hide'}
+#submodelo 3 se elimina la variable X11
+
+sub3 = vglm(y ~ X2 +	X5 +	X7 +	X8 +	X9 +	X12 +	X14 +	X15 +	X17 +	X18 +	X19 +	X20 +	
+              X21 +	X22 +	X23	+ X24	+ X26	+ X27	+ X28 +	X29 +	X30	+ X31	+ X32	+ X33 +	X34	+ X35	+ X36	+ 
+              X37 +	X38 +	X39 +	X40 +	X41	+ X42	+ X43	+ X44	+ X45	+ X46	+ X47 +	X48	+ X49 +	X50 +	X51 +	
+              X52 +	X53 +	X54 +	X55 +	X56 +	X57 +	X58 +	X59 +	X60 +	X61 +	X63 + X64 +	X65	+ X66 +	
+              X67 +	X68 +	X69,
+            data = BD, gamma1, trace = TRUE, crit = "coef")
+```
+
+Prueba modelo nulo vs submodelo 3
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# submodelo vs modelo nulo
+prueba = lrtest(sub3)
+prueba
+
+```
+
+Prueba submodelo 3 vs submodelo 2
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# superada la prueba, se prueba el submodelo vs el logit original
+prueba2 = lrtest(sub2, sub3)
+prueba2
+
+```
+
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+summary(sub3)
+
+```
+
+#### Submodelo 4
+
+```{r submodelo4, warning=FALSE, message=FALSE, include=TRUE, results='hide'}
+#submodelo 4 se elimina la variable X50
+
+sub4 = vglm(y ~ X2 +	X5 +	X7 +	X8 +	X9 +	X12 +	X14 +	X15 +	X17 +	X18 +	X19 +	X20 +	
+              X21 +	X22 +	X23	+ X24	+ X26	+ X27	+ X28 +	X29 +	X30	+ X31	+ X32	+ X33 +	X34	+ X35	+ X36	+ 
+              X37 +	X38 +	X39 +	X40 +	X41	+ X42	+ X43	+ X44	+ X45	+ X46	+ X47 +	X48	+ X49 +	X51 +	
+              X52 +	X53 +	X54 +	X55 +	X56 +	X57 +	X58 +	X59 +	X60 +	X61 +	X63 + X64 +	X65	+ X66 +	
+              X67 +	X68 +	X69,
+            data = BD, gamma1, trace = TRUE, crit = "coef")
+
+```
+
+Prueba modelo nulo vs submodelo 4
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# submodelo vs modelo nulo
+prueba = lrtest(sub4)
+prueba
+
+```
+
+Prueba submodelo 4 vs submodelo 3
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# superada la prueba, se prueba el submodelo vs el logit original
+prueba2 = lrtest(sub3, sub4)
+prueba2
+
+```
+
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+summary(sub4)
+```
+
+
+#### Submodelo 5
+
+```{r submodelo5, message=FALSE, warning=FALSE, include=TRUE, results='hide'}
+#submodelo 5 se elimina la variable X68
+
+sub5 = vglm(y ~ X2 +	X5 +	X7 +	X8 +	X9 +	X12 +	X14 +	X15 +	X17 +	X18 +	X19 +	X20 +	
+              X21 +	X22 +	X23	+ X24	+ X26	+ X27	+ X28 +	X29 +	X30	+ X31	+ X32	+ X33 +	X34	+ X35	+ X36	+ 
+              X37 +	X38 +	X39 +	X40 +	X41	+ X42	+ X43	+ X44	+ X45	+ X46	+ X47 +	X48	+ X49 +	X51 +	
+              X52 +	X53 +	X54 +	X55 +	X56 +	X57 +	X58 +	X59 +	X60 +	X61 +	X63 + X64 +	X65	+ X66 +	
+              X67 +	X69,
+            data = BD, gamma1, trace = TRUE, crit = "coef")
+
+```
+
+Prueba modelo nulo vs submodelo 5
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# submodelo vs modelo nulo
+prueba = lrtest(sub5)
+prueba
+
+```
+
+Prueba submodelo 5 vs submodelo 4
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# superada la prueba, se prueba el submodelo vs el logit original
+prueba2 = lrtest(sub4, sub5)
+prueba2
+
+```
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+summary(sub5)
+```
+
+
+#### Submodelo 6
+
+```{r submodelo 6, warning=FALSE, message=FALSE, include=TRUE, results='hide'}
+#submodelo 6 se elimina la variable X47
+
+sub6 = vglm(y ~ X2 +	X5 +	X7 +	X8 +	X9 +	X12 +	X14 +	X15 +	X17 +	X18 +	X19 +	X20 +	
+              X21 +	X22 +	X23	+ X24	+ X26	+ X27	+ X28 +	X29 +	X30	+ X31	+ X32	+ X33 +	X34	+ X35	+ X36	+ 
+              X37 +	X38 +	X39 +	X40 +	X41	+ X42	+ X43	+ X44	+ X45	+ X46 +	X48	+ X49 +	X51 +	
+              X52 +	X53 +	X54 +	X55 +	X56 +	X57 +	X58 +	X59 +	X60 +	X61 +	X63 + X64 +	X65	+ X66 +	
+              X67 +	X69,
+            data = BD, gamma1, trace = TRUE, crit = "coef")
+
+```
+
+Prueba modelo nulo vs submodelo 6
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# submodelo vs modelo nulo
+prueba = lrtest(sub6)
+prueba
+
+```
+
+Prueba submodelo 6 vs submodelo 5
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# superada la prueba, se prueba el submodelo vs el logit original
+prueba2 = lrtest(sub5, sub6)
+prueba2
+
+```
+
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+summary(sub6)
+```
+
+
+#### Submodelo 7
+
+```{r submodelo7, warning=FALSE, message=FALSE, include=TRUE, results='hide'}
+#submodelo 7 se elimina la variable X2
+
+sub7 = vglm(y ~ X5 +	X7 +	X8 +	X9 +	X12 +	X14 +	X15 +	X17 +	X18 +	X19 +	X20 +	
+              X21 +	X22 +	X23	+ X24	+ X26	+ X27	+ X28 +	X29 +	X30	+ X31	+ X32	+ X33 +	X34	+ X35	+ X36	+ 
+              X37 +	X38 +	X39 +	X40 +	X41	+ X42	+ X43	+ X44	+ X45	+ X46 +	X48	+ X49 +	X51 +	
+              X52 +	X53 +	X54 +	X55 +	X56 +	X57 +	X58 +	X59 +	X60 +	X61 +	X63 + X64 +	X65	+ X66 +	
+              X67 +	X69,
+            data = BD, gamma1, trace = TRUE, crit = "coef")
+
+```
+
+Prueba modelo nulo vs submodelo 7
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# submodelo vs modelo nulo
+prueba = lrtest(sub7)
+prueba
+
+```
+
+Prueba submodelo 7 vs submodelo 6
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# superada la prueba, se prueba el submodelo vs el logit original
+prueba2 = lrtest(sub6, sub7)
+prueba2
+
+```
+
+Como se observa el submodelo 7 no supera la prueba de constraste contra el submodelo 6, por lo tanto, el submodelo 6 es el modelo logit con mejor ajuste.
+
+## Estimaciones
+
+Para las estimaciones se tiene en cuenta que siguiendo el supuesto de Reales (2015) donde $y_1,...,y_n$ son variables aleatorias independientes, donde para cada $y_t,\; t=1,...,n.$ El modelo se obtiene asumiendo que la media de cada $y_t,\;\mu_t,$ es vinculado al predictor lineal, $\eta_t$, como sigue: 
+
+$$g(\mu_t)=\sum_{i=i}^{k}x_{ti}\beta_i$$
+En consecuencia la Función Logit queda determinada como:
+
+$$logit(\mu)=ln\left(\frac{\mu}{1-\mu}\right)=\delta+x_5\beta_5+x_7\beta_7+x_8\beta_8+x_9\beta_9+x_12\beta_12+x_14\beta_14+x_15\beta_15+x_17\beta_17+x_18\beta_18+x_21\beta_21+x_22\beta_22+x_23\beta_23+x_24\beta_24+x_26\beta_26+x_27\beta_27+x_28\beta_28+x_37\beta_37+x_38\beta_38+x_39\beta_39+x_40\beta_40+x_41\beta_41+x_42\beta_42+x_43\beta_43+x_52\beta_52+x_53\beta_53+x_54\beta_54+x_55\beta_55+x_56\beta_56+x_57\beta_57+x_58\beta_58+x_67\beta_67+x_69\beta_69$$
+
+Mientras que los OR se estiman a partir de:
+
+$$ OR = e^{x_5\beta_5+x_7\beta_7+x_8\beta_8+x_9\beta_9+x_12\beta_12+x_14\beta_14+x_15\beta_15+x_17\beta_17+x_18\beta_18+x_21\beta_21+x_22\beta_22+x_23\beta_23+x_24\beta_24+x_26\beta_26+x_27\beta_27+x_28\beta_28+x_37\beta_37+x_38\beta_38+x_39\beta_39+x_40\beta_40+x_41\beta_41+x_42\beta_42+x_43\beta_43+x_52\beta_52+x_53\beta_53+x_54\beta_54+x_55\beta_55+x_56\beta_56+x_57\beta_57+x_58\beta_58+x_67\beta_67+x_69\beta_69}$$
+Así las cosas se estiman los probits así:
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+probs = exp(coef(sub6))/1+exp(coef(sub6))
+
+probs
+```
+
+
+Y los OR así:
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+OR = exp(coef(sub6))
+
+OR
+```
+
